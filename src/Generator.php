@@ -7,22 +7,20 @@ use LaravelJsonApi\Contracts\Server\Server;
 use LaravelJsonApi\Core\Support\AppResolver;
 use LaravelJsonApi\OpenApiSpec\Builders\InfoBuilder;
 use LaravelJsonApi\OpenApiSpec\Builders\PathsBuilder;
+use LaravelJsonApi\OpenApiSpec\Builders\SecurityBuilder;
+use LaravelJsonApi\OpenApiSpec\Builders\SecuritySchemesBuilder;
 use LaravelJsonApi\OpenApiSpec\Builders\ServerBuilder;
 
 class Generator
 {
     protected string $key;
-
     protected Server $server;
-
     protected InfoBuilder $infoBuilder;
-
     protected ServerBuilder $serverBuilder;
-
     protected PathsBuilder $pathsBuilder;
-
+    protected SecuritySchemesBuilder $securitySchemesBuilder;
+    protected SecurityBuilder $securityBuilder;
     protected ComponentsContainer $components;
-
     protected ResourceContainer $resources;
 
     /**
@@ -42,6 +40,8 @@ class Generator
         $this->components = new ComponentsContainer;
         $this->resources = new ResourceContainer($this->server);
         $this->pathsBuilder = new PathsBuilder($this, $this->components);
+        $this->securitySchemesBuilder = new SecuritySchemesBuilder($this);
+        $this->securityBuilder = new SecurityBuilder($this);
     }
 
     public function generate(): OpenApi
@@ -51,9 +51,18 @@ class Generator
             ->info($this->infoBuilder->build())
             ->servers(...$this->serverBuilder->build())
             ->paths(...array_values($this->pathsBuilder->build()))
-            ->components($this->components()->components());
+            ->components(
+                $this
+                    ->components()
+                    ->components()
+                    ->securitySchemes(...array_values($this->securitySchemesBuilder->build()))
+            )
+            ->security(...array_values($this->securityBuilder->build()));
     }
-
+ 
+    /**
+     * @return string
+     */
     public function key(): string
     {
         return $this->key;
