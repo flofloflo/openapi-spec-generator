@@ -14,13 +14,21 @@ use LaravelJsonApi\OpenApiSpec\Builders\ServerBuilder;
 class Generator
 {
     protected string $key;
+
     protected Server $server;
+
     protected InfoBuilder $infoBuilder;
+
     protected ServerBuilder $serverBuilder;
+
     protected PathsBuilder $pathsBuilder;
+
     protected SecuritySchemesBuilder $securitySchemesBuilder;
+
     protected SecurityBuilder $securityBuilder;
+
     protected ComponentsContainer $components;
+
     protected ResourceContainer $resources;
 
     /**
@@ -59,10 +67,7 @@ class Generator
             )
             ->security(...array_values($this->securityBuilder->build()));
     }
- 
-    /**
-     * @return string
-     */
+
     public function key(): string
     {
         return $this->key;

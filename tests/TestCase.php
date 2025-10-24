@@ -30,8 +30,8 @@ abstract class TestCase extends BaseTestCase
 
         $app['config']->set('openapi.servers.v1.securitySchemes', [
             'Bearer' => [
-                'type'         => 'http',
-                'scheme'       => 'bearer',
+                'type' => 'http',
+                'scheme' => 'bearer',
                 'bearerFormat' => 'JWT',
                 'description' => 'Test Bearer description',
             ],
