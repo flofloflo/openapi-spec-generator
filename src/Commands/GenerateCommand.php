@@ -42,7 +42,7 @@ class GenerateCommand extends Command
             collect($exception->getErrors())
                 ->map(function ($val) {
                     return collect($val)->map(function ($val, $key) {
-                        return sprintf('%s: %s', ucfirst($key), $val);
+                        return sprintf('%s: %s', ucfirst($key), is_string($val) ? $val : json_encode($val));
                     })->join("\n");
                 })->each(function ($string) {
                     $this->line($string);
