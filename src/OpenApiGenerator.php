@@ -15,20 +15,20 @@ class OpenApiGenerator
         $generator = new Generator($serverKey);
         $openapi = $generator->generate();
 
+        // Fix empty scopes arrays BEFORE validation: OpenAPI spec requires scopes to be objects {}, not arrays []
+        // Convert empty arrays in OAuth2 flows.scopes to empty objects in the OpenAPI object structure
+        $this->fixEmptyScopesArraysInObject($openapi);
+
         $openapi->validate();
 
         $storageDisk = Storage::disk(config('openapi.filesystem_disk'));
 
         $fileName = $serverKey.'_openapi.'.$format;
 
-        // Fix empty scopes arrays: OpenAPI spec requires scopes to be objects {}, not arrays []
-        // Convert empty arrays in OAuth2 flows.scopes to empty objects
-        $specArray = $this->fixEmptyScopesArrays($openapi->toArray());
-
         if ($format === 'yaml') {
-            $output = Yaml::dump($specArray, 2, 4, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
+            $output = Yaml::dump($openapi->toArray(), 2, 4, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
         } elseif ($format === 'json') {
-            $output = json_encode($specArray, JSON_PRETTY_PRINT);
+            $output = json_encode($openapi->toArray(), JSON_PRETTY_PRINT);
         }
 
         $storageDisk->put($fileName, $output);
@@ -37,48 +37,63 @@ class OpenApiGenerator
     }
 
     /**
-     * Recursively convert empty scopes arrays to empty objects in OAuth2 flows.
-     * OpenAPI spec requires scopes to be objects {}, not arrays [].
+     * Fix empty scopes arrays in the OpenAPI object structure before validation.
+     * Uses reflection to access and modify protected properties of OAuthFlow objects.
      *
-     * @param  array|object  $data
-     * @return array|object
+     * @param  \GoldSpecDigital\ObjectOrientedOAS\OpenApi  $openapi
      */
-    protected function fixEmptyScopesArrays($data)
+    protected function fixEmptyScopesArraysInObject($openapi): void
     {
-        if (is_array($data)) {
-            $result = [];
-            foreach ($data as $key => $value) {
-                // Check if this is a scopes field in an OAuth2 flow
-                if ($key === 'scopes' && is_array($value) && empty($value)) {
-                    // Convert empty array to empty object
-                    $result[$key] = (object) [];
-                } elseif (is_array($value) || is_object($value)) {
-                    // Recursively process nested arrays/objects
-                    $result[$key] = $this->fixEmptyScopesArrays($value);
-                } else {
-                    $result[$key] = $value;
-                }
-            }
-
-            return $result;
-        } elseif (is_object($data)) {
-            $result = new \stdClass;
-            foreach ($data as $key => $value) {
-                // Check if this is a scopes field in an OAuth2 flow
-                if ($key === 'scopes' && is_array($value) && empty($value)) {
-                    // Convert empty array to empty object
-                    $result->$key = (object) [];
-                } elseif (is_array($value) || is_object($value)) {
-                    // Recursively process nested arrays/objects
-                    $result->$key = $this->fixEmptyScopesArrays($value);
-                } else {
-                    $result->$key = $value;
-                }
-            }
-
-            return $result;
+        $components = $openapi->components;
+        if (! $components) {
+            return;
         }
 
-        return $data;
+        // Use reflection to access securitySchemes property
+        $componentsReflection = new \ReflectionClass($components);
+        if (! $componentsReflection->hasProperty('securitySchemes')) {
+            return;
+        }
+
+        $securitySchemesProperty = $componentsReflection->getProperty('securitySchemes');
+        $securitySchemesProperty->setAccessible(true);
+        $securitySchemes = $securitySchemesProperty->getValue($components);
+
+        if (! is_array($securitySchemes)) {
+            return;
+        }
+
+        foreach ($securitySchemes as $scheme) {
+            // Use reflection to access flows property
+            $schemeReflection = new \ReflectionClass($scheme);
+            if (! $schemeReflection->hasProperty('flows')) {
+                continue;
+            }
+
+            $flowsProperty = $schemeReflection->getProperty('flows');
+            $flowsProperty->setAccessible(true);
+            $flows = $flowsProperty->getValue($scheme);
+
+            if (! is_array($flows)) {
+                continue;
+            }
+
+            foreach ($flows as $flow) {
+                // Use reflection to access the protected scopes property
+                $flowReflection = new \ReflectionClass($flow);
+                if (! $flowReflection->hasProperty('scopes')) {
+                    continue;
+                }
+
+                $scopesProperty = $flowReflection->getProperty('scopes');
+                $scopesProperty->setAccessible(true);
+                $scopes = $scopesProperty->getValue($flow);
+
+                // If scopes is an empty array, convert it to an empty object
+                if (is_array($scopes) && empty($scopes)) {
+                    $scopesProperty->setValue($flow, (object) []);
+                }
+            }
+        }
     }
 }
