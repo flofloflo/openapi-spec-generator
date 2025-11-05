@@ -6,7 +6,8 @@ Updates should follow the [Keep a CHANGELOG](https://keepachangelog.com/) princi
 
 ## [Unreleased]
 
-- Nothing
+- Add support for security schemes
+- Fix handling of empty "scopes" configuration
 
 ## [0.8.0] - 2025-01-31
 
